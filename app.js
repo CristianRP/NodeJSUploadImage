@@ -1,0 +1,55 @@
+'use strict'
+
+const express = require('express');
+const multer = require('multer');
+const fileType = require('file-type');
+const fs = require('fs');
+const app = express();
+const router = express.Router();
+
+const port = process.env.PORT || 8080;
+
+const upload = multer({
+  dest: 'images/',
+  limits: { fileSize: 10000000, files: 3 },
+  fileFilter: (req, file, callback) => {
+    if (!file.originalname.match(/\.(jpg||jpeg)$/)) {
+      return callback(new Error('Only images are allowed!'), false);
+    }
+    callback(null, true);
+  }
+}).single('image');
+
+router.post('/images/upload', (req, res) => {
+    upload(req, res, function(err) {
+      if (err) {
+        res.status(400).json({ message: err.message });
+      } else {
+        let path = `/images/${req.file.filename}`;
+        res.status(200).json({ message: 'Image uploaded successfuly!', path: path});
+      }
+    })
+});
+
+router.get('/images/:imagename', (req, res) => {
+  let imagename = req.params.imagename;
+  let imagepath = __dirname + "/images/" + imagename;
+  let image = fs.readFileSync(imagepath);
+  let mime = fileType(image).mime;
+
+  res.writeHead(200, { 'Content-Type': mime });
+  res.end(image, 'binary');
+});
+
+app.use('/', router);
+
+app.use((err, req, res, next) => {
+  if (err.code == 'ENOENT') {
+    res.status(404).json({ message: 'Image not found!' });
+  } else {
+    res.status(500).json({ message: err.message });
+  }
+})
+
+app.listen(port);
+console.log(`App Runs on ${port}`);
